@@ -408,7 +408,7 @@ def send_email(rows, placements):
   </td></tr>
 
   <tr><td style="padding:16px 32px 28px;border-top:1px solid #eee;text-align:center;">
-    <a href="https://YOUR_GITHUB_USERNAME.github.io/meta-report/" style="display:inline-block;padding:10px 24px;background:#000;color:#fff;border-radius:8px;font-size:13px;text-decoration:none;">查看完整儀表板 →</a>
+    <a href="https://vivienlin-git.github.io/psk-ads-report/" style="display:inline-block;padding:10px 24px;background:#000;color:#fff;border-radius:8px;font-size:13px;text-decoration:none;">查看完整儀表板 →</a>
   </td></tr>
 
   <tr><td style="padding:12px 32px;background:#f9f9f7;text-align:center;">
