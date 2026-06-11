@@ -117,33 +117,103 @@ def write_to_sheets(rows, placements):
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(SPREADSHEET_ID)
 
-    # 工作表 1：素材每日成效
+    # 工作表：每日素材成效
     try:
-        ws = sh.worksheet("每日素材成效")
+        ws_daily = sh.worksheet("每日素材成效")
     except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet("每日素材成效", rows=5000, cols=12)
-        ws.append_row(["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
+        ws_daily = sh.add_worksheet("每日素材成效", rows=5000, cols=8)
+        ws_daily.append_row(["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
 
     for r in rows:
-        ws.append_row([
+        ws_daily.append_row([
             r["date"], r["name"],
             r["spend"], r["impressions"], r["clicks"],
             r["ctr"], r["cpm"], r["roas"],
         ])
 
-    # 工作表 2：版面拆分
+    # 工作表：版面拆分
     try:
-        ws2 = sh.worksheet("版面拆分")
+        ws_plat = sh.worksheet("版面拆分")
     except gspread.WorksheetNotFound:
-        ws2 = sh.add_worksheet("版面拆分", rows=5000, cols=10)
-        ws2.append_row(["日期","版面","位置","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
+        ws_plat = sh.add_worksheet("版面拆分", rows=5000, cols=10)
+        ws_plat.append_row(["日期","版面","位置","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
 
     for r in placements:
-        ws2.append_row([
+        ws_plat.append_row([
             r["date"], r["platform"], r["position"], r["ad_name"],
             r["spend"], r["impressions"], r["clicks"],
             r["ctr"], r["cpm"], r["roas"],
         ])
+
+    # 工作表：彙總（放在最前面，每次全部重寫）
+    try:
+        ws_sum = sh.worksheet("📊 彙總")
+    except gspread.WorksheetNotFound:
+        ws_sum = sh.add_worksheet("📊 彙總", rows=200, cols=10)
+        sh.reorder_worksheets([ws_sum, ws_daily, ws_plat])
+
+    # 從所有歷史資料彙總（讀取整個每日素材成效）
+    all_rows = ws_daily.get_all_records()
+
+    # 依素材名稱彙總
+    summary = {}
+    for r in all_rows:
+        name = r.get("素材名稱", "")
+        if not name:
+            continue
+        if name not in summary:
+            summary[name] = {"花費": 0, "曝光": 0, "點擊": 0, "roas_sum": 0, "count": 0}
+        summary[name]["花費"] += float(r.get("花費", 0))
+        summary[name]["曝光"] += int(r.get("曝光", 0))
+        summary[name]["點擊"] += int(r.get("點擊", 0))
+        summary[name]["roas_sum"] += float(r.get("ROAS", 0))
+        summary[name]["count"] += 1
+
+    # 版面彙總
+    all_plat = ws_plat.get_all_records()
+    plat_summary = {}
+    for r in all_plat:
+        plat = r.get("版面", "")
+        if not plat:
+            continue
+        if plat not in plat_summary:
+            plat_summary[plat] = {"花費": 0, "點擊": 0, "ctr_sum": 0, "roas_sum": 0, "count": 0}
+        plat_summary[plat]["花費"] += float(r.get("花費", 0))
+        plat_summary[plat]["點擊"] += int(r.get("點擊", 0))
+        plat_summary[plat]["ctr_sum"] += float(r.get("CTR(%)", 0))
+        plat_summary[plat]["roas_sum"] += float(r.get("ROAS", 0))
+        plat_summary[plat]["count"] += 1
+
+    # 整理彙總工作表內容
+    summary_data = [
+        [f"PSK Meta 廣告彙總報表", "", "", "", "", "", "", ""],
+        [f"最後更新：{yesterday}", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["【各版面彙總】", "", "", "", "", "", "", ""],
+        ["版面", "總花費 (NT$)", "總點擊", "平均 CTR (%)", "平均 ROAS", "", "", ""],
+    ]
+    for plat, v in sorted(plat_summary.items(), key=lambda x: -x[1]["花費"]):
+        avg_ctr = round(v["ctr_sum"] / v["count"], 2) if v["count"] else 0
+        avg_roas = round(v["roas_sum"] / v["count"], 2) if v["count"] else 0
+        summary_data.append([plat, round(v["花費"]), v["點擊"], avg_ctr, avg_roas, "", "", ""])
+
+    summary_data += [
+        ["", "", "", "", "", "", "", ""],
+        ["【素材彙總】", "", "", "", "", "", "", ""],
+        ["素材名稱", "總花費 (NT$)", "總曝光", "總點擊", "平均 ROAS", "建議", "", ""],
+    ]
+    for name, v in sorted(summary.items(), key=lambda x: -(x[1]["roas_sum"] / x[1]["count"] if x[1]["count"] else 0)):
+        avg_roas = round(v["roas_sum"] / v["count"], 2) if v["count"] else 0
+        suggest = "擴大投放" if avg_roas >= 4 else ("優化測試" if avg_roas >= 2 else "停止/調整")
+        summary_data.append([name, round(v["花費"]), v["曝光"], v["點擊"], avg_roas, suggest, "", ""])
+
+    ws_sum.clear()
+    ws_sum.update("A1", summary_data)
+
+    # 確保彙總在第一個位置
+    all_ws = sh.worksheets()
+    ws_order = [ws_sum] + [w for w in all_ws if w.id != ws_sum.id]
+    sh.reorder_worksheets(ws_order)
 
     print(f"✓ Google Sheets 已更新：{len(rows)} 筆素材，{len(placements)} 筆版面")
 
@@ -240,7 +310,7 @@ def send_email(rows, placements):
 <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;">
 
   <tr><td style="padding:28px 32px 20px;border-bottom:1px solid #eee;">
-    <p style="margin:0;font-size:11px;color:#888;letter-spacing:.08em;text-transform:uppercase;">Beanne · Meta 廣告日報</p>
+    <p style="margin:0;font-size:11px;color:#888;letter-spacing:.08em;text-transform:uppercase;">PSK · Meta 廣告日報</p>
     <h1 style="margin:6px 0 0;font-size:22px;font-weight:500;">{yesterday} 成效摘要</h1>
   </td></tr>
 
@@ -294,7 +364,7 @@ def send_email(rows, placements):
   </td></tr>
 
   <tr><td style="padding:12px 32px;background:#f9f9f7;text-align:center;">
-    <p style="margin:0;font-size:11px;color:#aaa;">Beanne · 自動產生 · {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+    <p style="margin:0;font-size:11px;color:#aaa;">PSK · 自動產生 · {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
   </td></tr>
 
 </table>
@@ -306,7 +376,7 @@ def send_email(rows, placements):
     recipients = [{"email": r.strip()} for r in REPORT_RECIPIENTS.split(",")]
     payload = {
         "personalizations": [{"to": recipients}],
-        "from": {"email": SENDER_EMAIL, "name": "Beanne 廣告報表"},
+        "from": {"email": SENDER_EMAIL, "name": "PSK 廣告報表"},
         "subject": f"📊 {yesterday} Meta 廣告日報 · ROAS {avg_roas:.2f} · 花費 NT${total_spend:,.0f}",
         "content": [{"type": "text/html", "value": html_body}],
     }
