@@ -20,36 +20,38 @@ yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
 
 # ── 1. 從 Meta Marketing API 拉資料 ─────────────────────────────────────
 def fetch_meta_data():
+    # 先拿廣告清單（只拿 id 和 name）
     url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/ads"
     params = {
-        "fields": (
-            "name,"
-            "insights.date_preset(yesterday){"
-            "spend,impressions,clicks,ctr,cpm,"
-            "purchase_roas"
-            "}"
-        ),
+        "fields": "id,name",
         "access_token": META_ACCESS_TOKEN,
         "limit": 100,
     }
     res = requests.get(url, params=params)
     res.raise_for_status()
-    raw = res.json().get("data", [])
+    ads = res.json().get("data", [])
+
+    # 再用 insights endpoint 拿成效（以 ad 為單位）
+    ins_url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/insights"
+    ins_params = {
+        "fields": "ad_id,ad_name,spend,impressions,clicks,ctr,cpm,purchase_roas",
+        "level": "ad",
+        "date_preset": "yesterday",
+        "access_token": META_ACCESS_TOKEN,
+        "limit": 200,
+    }
+    ins_res = requests.get(ins_url, params=ins_params)
+    ins_res.raise_for_status()
+    insights = ins_res.json().get("data", [])
 
     rows = []
-    for ad in raw:
-        insights_list = ad.get("insights", {}).get("data", [])
-        if not insights_list:
-            continue
-        ins = insights_list[0]
-
+    for ins in insights:
         roas_list = ins.get("purchase_roas", [])
         roas = float(roas_list[0]["value"]) if roas_list else 0.0
-
         rows.append({
             "date": yesterday,
-            "ad_id": ad["id"],
-            "name": ad.get("name", ""),
+            "ad_id": ins.get("ad_id", ""),
+            "name": ins.get("ad_name", ""),
             "thumbnail": "",
             "spend": float(ins.get("spend", 0)),
             "impressions": int(ins.get("impressions", 0)),
