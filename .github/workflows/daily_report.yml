@@ -1,0 +1,46 @@
+name: Meta 廣告日報
+
+on:
+  schedule:
+    # 每天台灣時間早上 08:00 執行（UTC+8，所以填 UTC 00:00）
+    - cron: "0 0 * * *"
+  # 也可以在 GitHub 上手動觸發，方便測試
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # 讓 Action 可以 commit report.json 回 repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run report script
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
+          GOOGLE_CREDS_JSON: ${{ secrets.GOOGLE_CREDS_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDER_EMAIL: vivien.lin@beanne.com.tw
+          REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
+        run: python fetch_meta.py
+
+      - name: Commit updated report.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/report.json
+          git diff --staged --quiet || git commit -m "chore: update report $(date -u '+%Y-%m-%d')"
+          git push

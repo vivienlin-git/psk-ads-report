@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beanne · Meta 廣告素材成效</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.08);
+    --text: #1a1a1a;
+    --muted: #888;
+    --green: #27500A; --green-bg: #EAF3DE;
+    --amber: #633806; --amber-bg: #FAEEDA;
+    --red: #791F1F;   --red-bg: #FCEBEB;
+    --blue-bg: #E6F1FB; --blue: #0C447C;
+    --ig-bg: #FBEAF0;  --ig: #72243E;
+    --gray-bg: #F1EFE8; --gray: #444441;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 16px; font-weight: 500; }
+  header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pills { display: flex; gap: 6px; }
+  .pill { padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+  .pill-fb { background: var(--blue-bg); color: var(--blue); }
+  .pill-ig { background: var(--ig-bg); color: var(--ig); }
+  .pill-th { background: var(--gray-bg); color: var(--gray); }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .metric-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px; }
+  .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .metric-val { font-size: 24px; font-weight: 500; }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .section-title { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .card-pad { padding: 20px; }
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .chart-box { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px; }
+  .chart-box p { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .chart-wrap { position: relative; height: 200px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 9px 12px; font-weight: 500; font-size: 11px; color: var(--muted); border-bottom: 0.5px solid var(--border); background: #fafaf8; white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafaf8; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+  .bg { background: var(--green-bg); color: var(--green); }
+  .ba { background: var(--amber-bg); color: var(--amber); }
+  .br { background: var(--red-bg); color: var(--red); }
+  .bb { background: var(--blue-bg); color: var(--blue); }
+  .bgr { background: var(--gray-bg); color: var(--gray); }
+  .filters { display: flex; gap: 8px; padding: 14px 16px; border-bottom: 0.5px solid var(--border); flex-wrap: wrap; align-items: center; background: #fafaf8; }
+  .filters label { font-size: 11px; color: var(--muted); }
+  select { font-size: 12px; padding: 5px 10px; border-radius: 8px; border: 0.5px solid rgba(0,0,0,0.15); background: #fff; color: var(--text); cursor: pointer; }
+  .thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 0.5px solid var(--border); display: block; }
+  .thumb-ph { width: 48px; height: 48px; border-radius: 8px; background: var(--bg); border: 0.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--muted); }
+  .heatmap-cell { padding: 10px 14px; text-align: center; font-weight: 500; font-size: 13px; }
+  .updated { font-size: 11px; color: var(--muted); text-align: right; padding: 0 4px 16px; }
+  @media (max-width: 640px) {
+    header { padding: 12px 16px; }
+    main { padding: 16px; }
+    .chart-grid { grid-template-columns: 1fr; }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Beanne · Meta 廣告素材成效</h1>
+    <p id="updatedAt">載入中...</p>
+  </div>
+  <div class="pills">
+    <span class="pill pill-fb">Facebook</span>
+    <span class="pill pill-ig">Instagram</span>
+    <span class="pill pill-th">Threads</span>
+  </div>
+</header>
+
+<main>
+  <div class="metric-grid" id="metricGrid"></div>
+
+  <p class="section-title">各版面成效比較</p>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <p>CTR 平均值 (%)</p>
+      <div class="chart-wrap"><canvas id="ctrChart" role="img" aria-label="各版面 CTR 比較">CTR 比較圖</canvas></div>
+    </div>
+    <div class="chart-box">
+      <p>ROAS 平均值</p>
+      <div class="chart-wrap"><canvas id="roasChart" role="img" aria-label="各版面 ROAS 比較">ROAS 比較圖</canvas></div>
+    </div>
+  </div>
+
+  <p class="section-title">素材類型 × 版面 ROAS</p>
+  <div class="card card-pad" style="margin-bottom:20px;">
+    <div id="heatmap"></div>
+  </div>
+
+  <p class="section-title">素材清單</p>
+  <div class="card">
+    <div class="filters">
+      <label>版面</label>
+      <select id="fPlat" onchange="renderTable()">
+        <option value="all">全部</option>
+        <option value="fb">Facebook</option>
+        <option value="ig">Instagram</option>
+        <option value="th">Threads</option>
+      </select>
+      <label>排序</label>
+      <select id="fSort" onchange="renderTable()">
+        <option value="roas">ROAS</option>
+        <option value="ctr">CTR</option>
+        <option value="spend">花費</option>
+        <option value="cpm">CPM</option>
+      </select>
+      <label>日期</label>
+      <select id="fDate" onchange="renderTable()"></select>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>圖</th>
+          <th>素材名稱</th>
+          <th>版面</th>
+          <th>花費 (NT$)</th>
+          <th>CTR</th>
+          <th>CPM</th>
+          <th>ROAS</th>
+          <th>建議</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <p class="updated" id="updatedFooter"></p>
+</main>
+
+<script>
+let DATA = { creatives: [], placements: [], updated_at: "" };
+let ctrChartInst, roasChartInst;
+
+const PLAT_LABEL = { fb: "Facebook", ig: "Instagram", th: "Threads" };
+const PLAT_CLASS = { fb: "pill-fb", ig: "pill-ig", th: "pill pill-th" };
+
+function platPill(p) {
+  const cls = { fb: "pill pill-fb", ig: "pill pill-ig", th: "pill pill-th" }[p] || "";
+  return `<span class="${cls}" style="font-size:11px;">${PLAT_LABEL[p] || p}</span>`;
+}
+function roasBadge(r) {
+  if (r >= 4) return `<span class="badge bg">${r.toFixed(2)}</span>`;
+  if (r >= 2.5) return `<span class="badge ba">${r.toFixed(2)}</span>`;
+  return `<span class="badge br">${r.toFixed(2)}</span>`;
+}
+function suggestBadge(d) {
+  if (d.roas >= 4 && d.ctr >= 2.5) return `<span class="badge bg">擴大投放</span>`;
+  if (d.roas < 2 || d.ctr < 1.5) return `<span class="badge br">停止/調整</span>`;
+  if (d.platform === "th") return `<span class="badge bgr">觀察中</span>`;
+  return `<span class="badge ba">優化測試</span>`;
+}
+
+function renderMetrics(data) {
+  if (!data.length) return;
+  const totalSpend = data.reduce((s, d) => s + d.spend, 0);
+  const wRoas = data.reduce((s, d) => s + d.roas * d.spend, 0) / totalSpend;
+  const avgCtr = data.reduce((s, d) => s + d.ctr, 0) / data.length;
+  const avgCpm = data.reduce((s, d) => s + d.cpm, 0) / data.length;
+  const roasColor = wRoas >= 3 ? "var(--green)" : "var(--red)";
+  document.getElementById("metricGrid").innerHTML = `
+    <div class="metric-card"><div class="metric-label">總花費</div><div class="metric-val">NT$${(totalSpend/1000).toFixed(0)}K</div></div>
+    <div class="metric-card"><div class="metric-label">加權 ROAS</div><div class="metric-val" style="color:${roasColor}">${wRoas.toFixed(2)}</div></div>
+    <div class="metric-card"><div class="metric-label">平均 CTR</div><div class="metric-val">${avgCtr.toFixed(2)}%</div></div>
+    <div class="metric-card"><div class="metric-label">平均 CPM</div><div class="metric-val">NT$${Math.round(avgCpm)}</div></div>
+    <div class="metric-card"><div class="metric-label">素材數</div><div class="metric-val">${data.length}</div></div>
+  `;
+}
+
+function renderCharts(placements) {
+  const plats = ["fb", "ig", "th"];
+  function avg(plat, key) {
+    const rows = placements.filter(d => d.platform === plat);
+    return rows.length ? rows.reduce((s, d) => s + d[key], 0) / rows.length : 0;
+  }
+  const labels = ["Facebook", "Instagram", "Threads"];
+  const colors = ["#378ADD", "#D4537E", "#888780"];
+
+  if (ctrChartInst) ctrChartInst.destroy();
+  if (roasChartInst) roasChartInst.destroy();
+
+  ctrChartInst = new Chart(document.getElementById("ctrChart"), {
+    type: "bar",
+    data: { labels, datasets: [{ data: plats.map(p => +avg(p,"ctr").toFixed(2)), backgroundColor: colors, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + "%" } } } }
+  });
+  roasChartInst = new Chart(document.getElementById("roasChart"), {
+    type: "bar",
+    data: { labels, datasets: [{ data: plats.map(p => +avg(p,"roas").toFixed(2)), backgroundColor: colors, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+function renderHeatmap(creatives) {
+  const types = [...new Set(creatives.map(d => d.type))].filter(Boolean);
+  const plats = ["fb", "ig", "th"];
+  const typeLabels = { image: "圖片", video: "影片", carousel: "輪播" };
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <tr><th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:500;font-size:11px;border-bottom:0.5px solid var(--border);">素材類型</th>`;
+  plats.forEach(p => { html += `<th style="padding:8px 12px;text-align:center;color:var(--muted);font-weight:500;font-size:11px;border-bottom:0.5px solid var(--border);">${PLAT_LABEL[p]}</th>`; });
+  html += "</tr>";
+  types.forEach(t => {
+    html += `<tr><td style="padding:10px 12px;font-weight:500;border-bottom:0.5px solid var(--border);">${typeLabels[t] || t}</td>`;
+    plats.forEach(p => {
+      const rows = creatives.filter(d => d.type === t && d.platform === p);
+      if (!rows.length) { html += `<td class="heatmap-cell" style="border-bottom:0.5px solid var(--border);color:var(--muted);">—</td>`; return; }
+      const avg = rows.reduce((s, d) => s + d.roas, 0) / rows.length;
+      let bg, color;
+      if (avg >= 4.5) { bg = "#C0DD97"; color = "#27500A"; }
+      else if (avg >= 3.5) { bg = "#EAF3DE"; color = "#3B6D11"; }
+      else if (avg >= 2.5) { bg = "#FAEEDA"; color = "#633806"; }
+      else { bg = "#FCEBEB"; color = "#791F1F"; }
+      html += `<td class="heatmap-cell" style="background:${bg};color:${color};border-bottom:0.5px solid var(--border);">${avg.toFixed(2)}</td>`;
+    });
+    html += "</tr>";
+  });
+  html += `</table><p style="font-size:11px;color:var(--muted);margin-top:8px;">數值為 ROAS 平均值</p>`;
+  document.getElementById("heatmap").innerHTML = html;
+}
+
+function renderTable() {
+  const plat = document.getElementById("fPlat").value;
+  const sort = document.getElementById("fSort").value;
+  const date = document.getElementById("fDate").value;
+
+  let rows = DATA.creatives.filter(d =>
+    (plat === "all" || d.platform === plat) &&
+    (date === "all" || d.date === date)
+  ).sort((a, b) => b[sort] - a[sort]);
+
+  document.getElementById("tableBody").innerHTML = rows.map(d => `
+    <tr>
+      <td>${d.thumbnail ? `<img class="thumb" src="${d.thumbnail}" alt="${d.name}">` : `<div class="thumb-ph">🖼</div>`}</td>
+      <td style="font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.name}</td>
+      <td>${platPill(d.platform)}</td>
+      <td>NT$${d.spend.toLocaleString()}</td>
+      <td style="color:${d.ctr >= 2.5 ? "var(--green)" : d.ctr < 1.5 ? "var(--red)" : "inherit"};font-weight:${d.ctr >= 2.5 ? 500 : 400};">${d.ctr.toFixed(2)}%</td>
+      <td>NT$${Math.round(d.cpm)}</td>
+      <td>${roasBadge(d.roas)}</td>
+      <td>${suggestBadge(d)}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">暫無資料</td></tr>`;
+}
+
+function populateDateFilter() {
+  const dates = [...new Set(DATA.creatives.map(d => d.date))].sort().reverse();
+  const sel = document.getElementById("fDate");
+  sel.innerHTML = `<option value="all">全部日期</option>` + dates.map(d => `<option value="${d}">${d}</option>`).join("");
+  if (dates[0]) sel.value = dates[0];
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(`data/report.json?t=${Date.now()}`);
+    if (!res.ok) throw new Error("找不到 data/report.json");
+    DATA = await res.json();
+  } catch {
+    // 無資料時用假資料展示版型
+    DATA = {
+      updated_at: new Date().toISOString(),
+      creatives: [
+        { date: new Date().toISOString().slice(0,10), name: "（示範資料）夏日優惠-主視覺A", type: "image", platform: "ig", spend: 14200, ctr: 2.80, cpm: 144.9, roas: 4.31, thumbnail: "" },
+        { date: new Date().toISOString().slice(0,10), name: "（示範資料）UGC 開箱影片-30s", type: "video", platform: "ig", spend: 22000, ctr: 3.40, cpm: 141.9, roas: 5.81, thumbnail: "" },
+        { date: new Date().toISOString().slice(0,10), name: "（示範資料）促銷倒數-動態圖",   type: "image", platform: "fb", spend: 12000, ctr: 2.50, cpm: 136.4, roas: 3.55, thumbnail: "" },
+        { date: new Date().toISOString().slice(0,10), name: "（示範資料）輪播-3款商品對比",  type: "carousel", platform: "th", spend: 5500, ctr: 1.30, cpm: 166.7, roas: 1.53, thumbnail: "" },
+      ],
+      placements: [
+        { date: new Date().toISOString().slice(0,10), platform: "fb", position: "feed", ad_name: "夏日優惠", spend: 30000, ctr: 2.30, cpm: 150, roas: 3.10 },
+        { date: new Date().toISOString().slice(0,10), platform: "ig", position: "feed", ad_name: "夏日優惠", spend: 28000, ctr: 3.10, cpm: 140, roas: 4.80 },
+        { date: new Date().toISOString().slice(0,10), platform: "th", position: "feed", ad_name: "夏日優惠", spend: 8000,  ctr: 1.20, cpm: 160, roas: 1.70 },
+      ]
+    };
+  }
+
+  const ts = DATA.updated_at ? new Date(DATA.updated_at).toLocaleString("zh-TW") : "";
+  document.getElementById("updatedAt").textContent = ts ? `最後更新：${ts}` : "示範資料模式";
+  document.getElementById("updatedFooter").textContent = ts ? `資料自動更新於 ${ts}` : "";
+
+  renderMetrics(DATA.creatives);
+  renderCharts(DATA.placements);
+  renderHeatmap(DATA.creatives);
+  populateDateFilter();
+  renderTable();
+}
+
+loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,331 @@
+import os
+import json
+import datetime
+import requests
+from google.oauth2.service_account import Credentials
+import gspread
+
+# ── 設定區（從環境變數讀取，不要直接寫在這裡）──────────────────────────
+META_ACCESS_TOKEN = os.environ["META_ACCESS_TOKEN"]
+META_AD_ACCOUNT_ID = os.environ["META_AD_ACCOUNT_ID"]   # 格式：act_123456789
+GOOGLE_CREDS_JSON = os.environ["GOOGLE_CREDS_JSON"]      # Service Account JSON 字串
+SPREADSHEET_ID = os.environ["SPREADSHEET_ID"]            # Google Sheets ID
+SENDGRID_API_KEY = os.environ["SENDGRID_API_KEY"]
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "vivien.lin@beanne.com.tw")
+REPORT_RECIPIENTS = os.environ.get("REPORT_RECIPIENTS", SENDER_EMAIL)  # 逗號分隔
+
+# ── 日期設定 ─────────────────────────────────────────────────────────────
+yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+
+
+# ── 1. 從 Meta Marketing API 拉資料 ─────────────────────────────────────
+def fetch_meta_data():
+    url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/ads"
+    params = {
+        "fields": (
+            "name,creative{thumbnail_url},"
+            "insights.date_preset(yesterday){"
+            "spend,impressions,clicks,ctr,cpm,"
+            "purchase_roas,actions,cost_per_action_type,"
+            "placement_indicator_sets"
+            "}"
+        ),
+        "access_token": META_ACCESS_TOKEN,
+        "limit": 100,
+    }
+    res = requests.get(url, params=params)
+    res.raise_for_status()
+    raw = res.json().get("data", [])
+
+    rows = []
+    for ad in raw:
+        insights_list = ad.get("insights", {}).get("data", [])
+        if not insights_list:
+            continue
+        ins = insights_list[0]
+
+        roas_list = ins.get("purchase_roas", [])
+        roas = float(roas_list[0]["value"]) if roas_list else 0.0
+
+        thumb = ad.get("creative", {}).get("thumbnail_url", "")
+
+        rows.append({
+            "date": yesterday,
+            "ad_id": ad["id"],
+            "name": ad.get("name", ""),
+            "thumbnail": thumb,
+            "spend": float(ins.get("spend", 0)),
+            "impressions": int(ins.get("impressions", 0)),
+            "clicks": int(ins.get("clicks", 0)),
+            "ctr": round(float(ins.get("ctr", 0)), 2),
+            "cpm": round(float(ins.get("cpm", 0)), 2),
+            "roas": round(roas, 2),
+        })
+
+    # 依版面拆分（Facebook / Instagram / Threads）
+    placements = fetch_placement_breakdown()
+    return rows, placements
+
+
+def fetch_placement_breakdown():
+    url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/insights"
+    params = {
+        "fields": "ad_name,spend,impressions,clicks,ctr,cpm,purchase_roas",
+        "breakdowns": "publisher_platform,platform_position",
+        "date_preset": "yesterday",
+        "access_token": META_ACCESS_TOKEN,
+        "limit": 200,
+    }
+    res = requests.get(url, params=params)
+    res.raise_for_status()
+    raw = res.json().get("data", [])
+
+    result = []
+    platform_map = {
+        "facebook": "fb",
+        "instagram": "ig",
+        "threads": "th",
+    }
+    for row in raw:
+        plat_raw = row.get("publisher_platform", "").lower()
+        plat = platform_map.get(plat_raw, plat_raw)
+        roas_list = row.get("purchase_roas", [])
+        roas = float(roas_list[0]["value"]) if roas_list else 0.0
+        result.append({
+            "date": yesterday,
+            "platform": plat,
+            "position": row.get("platform_position", ""),
+            "ad_name": row.get("ad_name", ""),
+            "spend": float(row.get("spend", 0)),
+            "impressions": int(row.get("impressions", 0)),
+            "clicks": int(row.get("clicks", 0)),
+            "ctr": round(float(row.get("ctr", 0)), 2),
+            "cpm": round(float(row.get("cpm", 0)), 2),
+            "roas": round(roas, 2),
+        })
+    return result
+
+
+# ── 2. 寫入 Google Sheets ────────────────────────────────────────────────
+def write_to_sheets(rows, placements):
+    creds_dict = json.loads(GOOGLE_CREDS_JSON)
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    )
+    gc = gspread.authorize(creds)
+    sh = gc.open_by_key(SPREADSHEET_ID)
+
+    # 工作表 1：素材每日成效
+    try:
+        ws = sh.worksheet("每日素材成效")
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet("每日素材成效", rows=5000, cols=12)
+        ws.append_row(["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
+
+    for r in rows:
+        ws.append_row([
+            r["date"], r["name"],
+            r["spend"], r["impressions"], r["clicks"],
+            r["ctr"], r["cpm"], r["roas"],
+        ])
+
+    # 工作表 2：版面拆分
+    try:
+        ws2 = sh.worksheet("版面拆分")
+    except gspread.WorksheetNotFound:
+        ws2 = sh.add_worksheet("版面拆分", rows=5000, cols=10)
+        ws2.append_row(["日期","版面","位置","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
+
+    for r in placements:
+        ws2.append_row([
+            r["date"], r["platform"], r["position"], r["ad_name"],
+            r["spend"], r["impressions"], r["clicks"],
+            r["ctr"], r["cpm"], r["roas"],
+        ])
+
+    print(f"✓ Google Sheets 已更新：{len(rows)} 筆素材，{len(placements)} 筆版面")
+
+
+# ── 3. 更新 data/report.json（給網站用）──────────────────────────────────
+def write_json(rows, placements):
+    os.makedirs("data", exist_ok=True)
+
+    # 讀取既有歷史（最多保留 30 天）
+    json_path = "data/report.json"
+    if os.path.exists(json_path):
+        with open(json_path) as f:
+            existing = json.load(f)
+    else:
+        existing = {"creatives": [], "placements": [], "updated_at": ""}
+
+    # 移除今天同日期的舊資料（避免重跑時重複）
+    existing["creatives"] = [r for r in existing["creatives"] if r["date"] != yesterday]
+    existing["placements"] = [r for r in existing["placements"] if r["date"] != yesterday]
+
+    existing["creatives"].extend(rows)
+    existing["placements"].extend(placements)
+
+    # 只保留最近 30 天
+    cutoff = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
+    existing["creatives"] = [r for r in existing["creatives"] if r["date"] >= cutoff]
+    existing["placements"] = [r for r in existing["placements"] if r["date"] >= cutoff]
+    existing["updated_at"] = datetime.datetime.now().isoformat()
+
+    with open(json_path, "w") as f:
+        json.dump(existing, f, ensure_ascii=False, indent=2)
+
+    print(f"✓ data/report.json 已更新")
+
+
+# ── 4. 發送 Email 日報 ───────────────────────────────────────────────────
+def send_email(rows, placements):
+    total_spend = sum(r["spend"] for r in rows)
+    avg_roas = (
+        sum(r["roas"] * r["spend"] for r in rows) / total_spend
+        if total_spend else 0
+    )
+    avg_ctr = sum(r["ctr"] for r in rows) / len(rows) if rows else 0
+
+    # 版面小結
+    plat_summary = {}
+    for p in placements:
+        k = p["platform"]
+        if k not in plat_summary:
+            plat_summary[k] = {"spend": 0, "roas_sum": 0, "ctr_sum": 0, "count": 0}
+        plat_summary[k]["spend"] += p["spend"]
+        plat_summary[k]["roas_sum"] += p["roas"]
+        plat_summary[k]["ctr_sum"] += p["ctr"]
+        plat_summary[k]["count"] += 1
+
+    plat_rows_html = ""
+    plat_labels = {"fb": "Facebook", "ig": "Instagram", "th": "Threads"}
+    plat_colors = {"fb": "#E6F1FB", "ig": "#FBEAF0", "th": "#F1EFE8"}
+    for k, v in plat_summary.items():
+        avg_r = v["roas_sum"] / v["count"]
+        avg_c = v["ctr_sum"] / v["count"]
+        color = "#27500A" if avg_r >= 4 else ("#633806" if avg_r >= 2.5 else "#791F1F")
+        plat_rows_html += f"""
+        <tr>
+          <td style="padding:10px 14px;border-bottom:1px solid #eee;">
+            <span style="background:{plat_colors.get(k,'#eee')};padding:2px 8px;border-radius:6px;font-size:12px;">{plat_labels.get(k, k)}</span>
+          </td>
+          <td style="padding:10px 14px;border-bottom:1px solid #eee;">NT${v['spend']:,.0f}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #eee;">{avg_c:.2f}%</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #eee;font-weight:600;color:{color};">{avg_r:.2f}</td>
+        </tr>"""
+
+    # 前5名素材
+    top5 = sorted(rows, key=lambda x: x["roas"], reverse=True)[:5]
+    top5_html = ""
+    for r in top5:
+        color = "#27500A" if r["roas"] >= 4 else ("#633806" if r["roas"] >= 2.5 else "#791F1F")
+        top5_html += f"""
+        <tr>
+          <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">{r['name']}</td>
+          <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">NT${r['spend']:,.0f}</td>
+          <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">{r['ctr']:.2f}%</td>
+          <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;font-weight:600;color:{color};">{r['roas']:.2f}</td>
+        </tr>"""
+
+    roas_color = "#27500A" if avg_roas >= 3 else "#791F1F"
+
+    html_body = f"""
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f5f5f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:32px 16px;">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;">
+
+  <tr><td style="padding:28px 32px 20px;border-bottom:1px solid #eee;">
+    <p style="margin:0;font-size:11px;color:#888;letter-spacing:.08em;text-transform:uppercase;">Beanne · Meta 廣告日報</p>
+    <h1 style="margin:6px 0 0;font-size:22px;font-weight:500;">{yesterday} 成效摘要</h1>
+  </td></tr>
+
+  <tr><td style="padding:20px 32px;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="33%" style="text-align:center;padding:12px;">
+          <p style="margin:0;font-size:11px;color:#888;">總花費</p>
+          <p style="margin:4px 0 0;font-size:26px;font-weight:500;">NT${total_spend:,.0f}</p>
+        </td>
+        <td width="33%" style="text-align:center;padding:12px;border-left:1px solid #eee;border-right:1px solid #eee;">
+          <p style="margin:0;font-size:11px;color:#888;">加權 ROAS</p>
+          <p style="margin:4px 0 0;font-size:26px;font-weight:500;color:{roas_color};">{avg_roas:.2f}</p>
+        </td>
+        <td width="33%" style="text-align:center;padding:12px;">
+          <p style="margin:0;font-size:11px;color:#888;">平均 CTR</p>
+          <p style="margin:4px 0 0;font-size:26px;font-weight:500;">{avg_ctr:.2f}%</p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:0 32px 20px;">
+    <p style="font-size:12px;font-weight:500;color:#555;margin-bottom:8px;">各版面成效</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
+      <tr style="background:#f9f9f7;">
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">版面</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">花費</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">CTR</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">ROAS</th>
+      </tr>
+      {plat_rows_html}
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:0 32px 24px;">
+    <p style="font-size:12px;font-weight:500;color:#555;margin-bottom:8px;">ROAS 前 5 名素材</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
+      <tr style="background:#f9f9f7;">
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">素材名稱</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">花費</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">CTR</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">ROAS</th>
+      </tr>
+      {top5_html}
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:16px 32px 28px;border-top:1px solid #eee;text-align:center;">
+    <a href="https://YOUR_GITHUB_USERNAME.github.io/meta-report/" style="display:inline-block;padding:10px 24px;background:#000;color:#fff;border-radius:8px;font-size:13px;text-decoration:none;">查看完整儀表板 →</a>
+  </td></tr>
+
+  <tr><td style="padding:12px 32px;background:#f9f9f7;text-align:center;">
+    <p style="margin:0;font-size:11px;color:#aaa;">Beanne · 自動產生 · {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+    recipients = [{"email": r.strip()} for r in REPORT_RECIPIENTS.split(",")]
+    payload = {
+        "personalizations": [{"to": recipients}],
+        "from": {"email": SENDER_EMAIL, "name": "Beanne 廣告報表"},
+        "subject": f"📊 {yesterday} Meta 廣告日報 · ROAS {avg_roas:.2f} · 花費 NT${total_spend:,.0f}",
+        "content": [{"type": "text/html", "value": html_body}],
+    }
+    res = requests.post(
+        "https://api.sendgrid.com/v3/mail/send",
+        headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+        json=payload,
+    )
+    res.raise_for_status()
+    print(f"✓ Email 已發送至 {REPORT_RECIPIENTS}")
+
+
+# ── 主程式 ───────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    print(f"▶ 開始拉取 {yesterday} 的資料...")
+    rows, placements = fetch_meta_data()
+    print(f"  拿到 {len(rows)} 筆素材，{len(placements)} 筆版面資料")
+
+    write_to_sheets(rows, placements)
+    write_json(rows, placements)
+    send_email(rows, placements)
+
+    print("✓ 完成")
