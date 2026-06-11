@@ -23,11 +23,10 @@ def fetch_meta_data():
     url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/ads"
     params = {
         "fields": (
-            "name,creative{thumbnail_url},"
+            "name,"
             "insights.date_preset(yesterday){"
             "spend,impressions,clicks,ctr,cpm,"
-            "purchase_roas,actions,cost_per_action_type,"
-            "placement_indicator_sets"
+            "purchase_roas"
             "}"
         ),
         "access_token": META_ACCESS_TOKEN,
@@ -47,13 +46,11 @@ def fetch_meta_data():
         roas_list = ins.get("purchase_roas", [])
         roas = float(roas_list[0]["value"]) if roas_list else 0.0
 
-        thumb = ad.get("creative", {}).get("thumbnail_url", "")
-
         rows.append({
             "date": yesterday,
             "ad_id": ad["id"],
             "name": ad.get("name", ""),
-            "thumbnail": thumb,
+            "thumbnail": "",
             "spend": float(ins.get("spend", 0)),
             "impressions": int(ins.get("impressions", 0)),
             "clicks": int(ins.get("clicks", 0)),
