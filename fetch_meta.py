@@ -19,11 +19,20 @@ yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
 
 
 # ── 1. 從 Meta Marketing API 拉資料 ─────────────────────────────────────
+def learning_label(days: int) -> str:
+    if days <= 7:
+        return "🔵 學習中"
+    elif days <= 14:
+        return "🟡 剛出學習"
+    else:
+        return "🟢 已穩定"
+
+
 def fetch_meta_data():
-    # 先拿廣告清單（只拿 id 和 name）
+    # 先拿廣告清單（含上檔時間）
     url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/ads"
     params = {
-        "fields": "id,name",
+        "fields": "id,name,created_time",
         "access_token": META_ACCESS_TOKEN,
         "limit": 100,
     }
@@ -32,6 +41,15 @@ def fetch_meta_data():
         print(f"API error: {res.status_code} {res.text}")
     res.raise_for_status()
     ads = res.json().get("data", [])
+
+    # 建立 ad_id → 上檔日期 的對照表
+    today = datetime.date.today()
+    ad_start = {}
+    for ad in ads:
+        raw_time = ad.get("created_time", "")
+        if raw_time:
+            start_date = datetime.date.fromisoformat(raw_time[:10])
+            ad_start[ad["id"]] = start_date
 
     # 再用 insights endpoint 拿成效（以 ad 為單位）
     ins_url = f"https://graph.facebook.com/v19.0/{META_AD_ACCOUNT_ID}/insights"
@@ -50,9 +68,12 @@ def fetch_meta_data():
     for ins in insights:
         roas_list = ins.get("purchase_roas", [])
         roas = float(roas_list[0]["value"]) if roas_list else 0.0
+        ad_id = ins.get("ad_id", "")
+        start_date = ad_start.get(ad_id)
+        days_running = (today - start_date).days if start_date else None
         rows.append({
             "date": yesterday,
-            "ad_id": ins.get("ad_id", ""),
+            "ad_id": ad_id,
             "name": ins.get("ad_name", ""),
             "thumbnail": "",
             "spend": float(ins.get("spend", 0)),
@@ -61,6 +82,9 @@ def fetch_meta_data():
             "ctr": round(float(ins.get("ctr", 0)), 2),
             "cpm": round(float(ins.get("cpm", 0)), 2),
             "roas": round(roas, 2),
+            "start_date": start_date.isoformat() if start_date else "",
+            "days_running": days_running if days_running is not None else "",
+            "learning_status": learning_label(days_running) if days_running is not None else "",
         })
 
     # 依版面拆分（Facebook / Instagram / Threads）
@@ -121,14 +145,15 @@ def write_to_sheets(rows, placements):
     try:
         ws_daily = sh.worksheet("每日素材成效")
     except gspread.WorksheetNotFound:
-        ws_daily = sh.add_worksheet("每日素材成效", rows=5000, cols=8)
-        ws_daily.append_row(["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
+        ws_daily = sh.add_worksheet("每日素材成效", rows=5000, cols=11)
+        ws_daily.append_row(["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS","上檔日期","已投天數","學習狀態"])
 
     for r in rows:
         ws_daily.append_row([
             r["date"], r["name"],
             r["spend"], r["impressions"], r["clicks"],
             r["ctr"], r["cpm"], r["roas"],
+            r["start_date"], r["days_running"], r["learning_status"],
         ])
 
     # 工作表：版面拆分
@@ -156,18 +181,23 @@ def write_to_sheets(rows, placements):
     all_rows = ws_daily.get_all_records()
 
     # 依素材名稱彙總
+    today = datetime.date.today()
     summary = {}
     for r in all_rows:
         name = r.get("素材名稱", "")
         if not name:
             continue
         if name not in summary:
-            summary[name] = {"花費": 0, "曝光": 0, "點擊": 0, "roas_sum": 0, "count": 0}
+            summary[name] = {"花費": 0, "曝光": 0, "點擊": 0, "roas_sum": 0, "count": 0, "start_date": ""}
         summary[name]["花費"] += float(r.get("花費", 0))
         summary[name]["曝光"] += int(r.get("曝光", 0))
         summary[name]["點擊"] += int(r.get("點擊", 0))
         summary[name]["roas_sum"] += float(r.get("ROAS", 0))
         summary[name]["count"] += 1
+        # 取最早的上檔日期
+        sd = r.get("上檔日期", "")
+        if sd and (not summary[name]["start_date"] or sd < summary[name]["start_date"]):
+            summary[name]["start_date"] = sd
 
     # 版面彙總
     all_plat = ws_plat.get_all_records()
@@ -198,14 +228,20 @@ def write_to_sheets(rows, placements):
         summary_data.append([plat, round(v["花費"]), v["點擊"], avg_ctr, avg_roas, "", "", ""])
 
     summary_data += [
-        ["", "", "", "", "", "", "", ""],
-        ["【素材彙總】", "", "", "", "", "", "", ""],
-        ["素材名稱", "總花費 (NT$)", "總曝光", "總點擊", "平均 ROAS", "建議", "", ""],
+        ["", "", "", "", "", "", "", "", ""],
+        ["【素材彙總】", "", "", "", "", "", "", "", ""],
+        ["素材名稱", "上檔日期", "已投天數", "總花費 (NT$)", "總曝光", "總點擊", "平均 ROAS", "學習狀態", "建議"],
     ]
     for name, v in sorted(summary.items(), key=lambda x: -(x[1]["roas_sum"] / x[1]["count"] if x[1]["count"] else 0)):
         avg_roas = round(v["roas_sum"] / v["count"], 2) if v["count"] else 0
         suggest = "擴大投放" if avg_roas >= 4 else ("優化測試" if avg_roas >= 2 else "停止/調整")
-        summary_data.append([name, round(v["花費"]), v["曝光"], v["點擊"], avg_roas, suggest, "", ""])
+        start_date = v["start_date"]
+        if start_date:
+            days = (today - datetime.date.fromisoformat(start_date)).days
+            status = learning_label(days)
+        else:
+            days, status = "", ""
+        summary_data.append([name, start_date, days, round(v["花費"]), v["曝光"], v["點擊"], avg_roas, status, suggest])
 
     ws_sum.clear()
     ws_sum.update("A1", summary_data)
@@ -291,9 +327,11 @@ def send_email(rows, placements):
     top5_html = ""
     for r in top5:
         color = "#27500A" if r["roas"] >= 4 else ("#633806" if r["roas"] >= 2.5 else "#791F1F")
+        days_str = f"{r['days_running']} 天" if r['days_running'] != "" else "-"
         top5_html += f"""
         <tr>
           <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">{r['name']}</td>
+          <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">{r['learning_status'] or '-'}<br><span style="color:#aaa;font-size:11px;">{days_str}</span></td>
           <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">NT${r['spend']:,.0f}</td>
           <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;">{r['ctr']:.2f}%</td>
           <td style="padding:8px 14px;border-bottom:1px solid #eee;font-size:13px;font-weight:600;color:{color};">{r['roas']:.2f}</td>
@@ -351,6 +389,7 @@ def send_email(rows, placements):
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
       <tr style="background:#f9f9f7;">
         <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">素材名稱</th>
+        <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">學習狀態</th>
         <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">花費</th>
         <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">CTR</th>
         <th style="padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;">ROAS</th>
