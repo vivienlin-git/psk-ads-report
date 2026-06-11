@@ -142,11 +142,16 @@ def write_to_sheets(rows, placements):
     sh = gc.open_by_key(SPREADSHEET_ID)
 
     # 工作表：每日素材成效
+    daily_headers = ["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS","上檔日期","已投天數","學習狀態"]
     try:
         ws_daily = sh.worksheet("每日素材成效")
+        # 若是舊版標題（缺少新欄位），直接更新第一列
+        existing_headers = ws_daily.row_values(1)
+        if existing_headers != daily_headers:
+            ws_daily.update("A1", [daily_headers])
     except gspread.WorksheetNotFound:
         ws_daily = sh.add_worksheet("每日素材成效", rows=5000, cols=11)
-        ws_daily.append_row(["日期","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS","上檔日期","已投天數","學習狀態"])
+        ws_daily.append_row(daily_headers)
 
     for r in rows:
         ws_daily.append_row([
@@ -157,11 +162,15 @@ def write_to_sheets(rows, placements):
         ])
 
     # 工作表：版面拆分
+    plat_headers = ["日期","版面","位置","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"]
     try:
         ws_plat = sh.worksheet("版面拆分")
+        existing_plat_headers = ws_plat.row_values(1)
+        if existing_plat_headers != plat_headers:
+            ws_plat.update("A1", [plat_headers])
     except gspread.WorksheetNotFound:
         ws_plat = sh.add_worksheet("版面拆分", rows=5000, cols=10)
-        ws_plat.append_row(["日期","版面","位置","素材名稱","花費","曝光","點擊","CTR(%)","CPM","ROAS"])
+        ws_plat.append_row(plat_headers)
 
     for r in placements:
         ws_plat.append_row([
