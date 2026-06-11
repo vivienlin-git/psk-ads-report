@@ -28,6 +28,8 @@ def fetch_meta_data():
         "limit": 100,
     }
     res = requests.get(url, params=params)
+    if not res.ok:
+        print(f"API error: {res.status_code} {res.text}")
     res.raise_for_status()
     ads = res.json().get("data", [])
 
