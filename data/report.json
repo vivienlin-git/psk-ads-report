@@ -10,7 +10,10 @@
       "clicks": 107,
       "ctr": 1.76,
       "cpm": 5.77,
-      "roas": 1.48
+      "roas": 1.48,
+      "start_date": "2026-01-19",
+      "days_running": 143,
+      "learning_status": "🟢 已穩定"
     },
     {
       "date": "2026-06-10",
@@ -22,7 +25,10 @@
       "clicks": 0,
       "ctr": 0.0,
       "cpm": 4.0,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-04-13",
+      "days_running": 59,
+      "learning_status": "🟢 已穩定"
     },
     {
       "date": "2026-06-10",
@@ -34,7 +40,10 @@
       "clicks": 0,
       "ctr": 0.0,
       "cpm": 6.92,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-05-15",
+      "days_running": 27,
+      "learning_status": "🟢 已穩定"
     },
     {
       "date": "2026-06-10",
@@ -46,7 +55,10 @@
       "clicks": 54,
       "ctr": 1.05,
       "cpm": 3.93,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "",
+      "days_running": "",
+      "learning_status": ""
     },
     {
       "date": "2026-06-10",
@@ -58,7 +70,10 @@
       "clicks": 5,
       "ctr": 2.45,
       "cpm": 7.3,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-05-26",
+      "days_running": 16,
+      "learning_status": "🟢 已穩定"
     },
     {
       "date": "2026-06-10",
@@ -70,7 +85,10 @@
       "clicks": 34,
       "ctr": 2.43,
       "cpm": 7.74,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-05-29",
+      "days_running": 13,
+      "learning_status": "🟡 剛出學習"
     },
     {
       "date": "2026-06-10",
@@ -82,7 +100,10 @@
       "clicks": 30,
       "ctr": 0.75,
       "cpm": 5.37,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-06-02",
+      "days_running": 9,
+      "learning_status": "🟡 剛出學習"
     },
     {
       "date": "2026-06-10",
@@ -94,7 +115,10 @@
       "clicks": 5,
       "ctr": 3.62,
       "cpm": 9.28,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-06-08",
+      "days_running": 3,
+      "learning_status": "🔵 學習中"
     },
     {
       "date": "2026-06-10",
@@ -106,7 +130,10 @@
       "clicks": 21,
       "ctr": 3.54,
       "cpm": 11.4,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-06-09",
+      "days_running": 2,
+      "learning_status": "🔵 學習中"
     },
     {
       "date": "2026-06-10",
@@ -118,7 +145,10 @@
       "clicks": 7,
       "ctr": 2.86,
       "cpm": 8.08,
-      "roas": 16.37
+      "roas": 16.37,
+      "start_date": "2026-06-09",
+      "days_running": 2,
+      "learning_status": "🔵 學習中"
     },
     {
       "date": "2026-06-10",
@@ -130,7 +160,10 @@
       "clicks": 53,
       "ctr": 1.39,
       "cpm": 5.09,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-06-10",
+      "days_running": 1,
+      "learning_status": "🔵 學習中"
     },
     {
       "date": "2026-06-10",
@@ -142,7 +175,10 @@
       "clicks": 2,
       "ctr": 2.74,
       "cpm": 4.66,
-      "roas": 0.0
+      "roas": 0.0,
+      "start_date": "2026-06-10",
+      "days_running": 1,
+      "learning_status": "🔵 學習中"
     }
   ],
   "placements": [
@@ -151,7 +187,7 @@
       "platform": "audience_network",
       "position": "an_classic",
       "ad_name": "",
-      "spend": 1.410118,
+      "spend": 1.41,
       "impressions": 130,
       "clicks": 14,
       "ctr": 10.77,
@@ -163,7 +199,7 @@
       "platform": "audience_network",
       "position": "rewarded_video",
       "ad_name": "",
-      "spend": 0.440037,
+      "spend": 0.44,
       "impressions": 21,
       "clicks": 7,
       "ctr": 33.33,
@@ -175,7 +211,7 @@
       "platform": "fb",
       "position": "facebook_notification",
       "ad_name": "",
-      "spend": 0.420035,
+      "spend": 0.42,
       "impressions": 45,
       "clicks": 0,
       "ctr": 0.0,
@@ -187,7 +223,7 @@
       "platform": "fb",
       "position": "facebook_profile_feed",
       "ad_name": "",
-      "spend": 0.150013,
+      "spend": 0.15,
       "impressions": 61,
       "clicks": 0,
       "ctr": 0.0,
@@ -199,7 +235,7 @@
       "platform": "fb",
       "position": "facebook_reels",
       "ad_name": "",
-      "spend": 11.931002,
+      "spend": 11.93,
       "impressions": 1745,
       "clicks": 19,
       "ctr": 1.09,
@@ -211,7 +247,7 @@
       "platform": "fb",
       "position": "facebook_reels_overlay",
       "ad_name": "",
-      "spend": 1.240104,
+      "spend": 1.24,
       "impressions": 690,
       "clicks": 2,
       "ctr": 0.29,
@@ -223,7 +259,7 @@
       "platform": "fb",
       "position": "facebook_stories",
       "ad_name": "",
-      "spend": 2.670224,
+      "spend": 2.67,
       "impressions": 321,
       "clicks": 5,
       "ctr": 1.56,
@@ -235,7 +271,7 @@
       "platform": "fb",
       "position": "feed",
       "ad_name": "",
-      "spend": 74.926293,
+      "spend": 74.93,
       "impressions": 11254,
       "clicks": 217,
       "ctr": 1.93,
@@ -247,7 +283,7 @@
       "platform": "fb",
       "position": "instream_video",
       "ad_name": "",
-      "spend": 0.890075,
+      "spend": 0.89,
       "impressions": 191,
       "clicks": 4,
       "ctr": 2.09,
@@ -259,7 +295,7 @@
       "platform": "fb",
       "position": "marketplace",
       "ad_name": "",
-      "spend": 0.010001,
+      "spend": 0.01,
       "impressions": 20,
       "clicks": 0,
       "ctr": 0.0,
@@ -271,7 +307,7 @@
       "platform": "fb",
       "position": "right_hand_column",
       "ad_name": "",
-      "spend": 0.640054,
+      "spend": 0.64,
       "impressions": 640,
       "clicks": 0,
       "ctr": 0.0,
@@ -283,7 +319,7 @@
       "platform": "fb",
       "position": "search",
       "ad_name": "",
-      "spend": 0.440037,
+      "spend": 0.44,
       "impressions": 34,
       "clicks": 0,
       "ctr": 0.0,
@@ -295,7 +331,7 @@
       "platform": "ig",
       "position": "feed",
       "ad_name": "",
-      "spend": 5.310446,
+      "spend": 5.31,
       "impressions": 658,
       "clicks": 3,
       "ctr": 0.46,
@@ -307,7 +343,7 @@
       "platform": "ig",
       "position": "instagram_explore_grid_home",
       "ad_name": "",
-      "spend": 0.020002,
+      "spend": 0.02,
       "impressions": 4,
       "clicks": 0,
       "ctr": 0.0,
@@ -319,7 +355,7 @@
       "platform": "ig",
       "position": "instagram_reels",
       "ad_name": "",
-      "spend": 3.790318,
+      "spend": 3.79,
       "impressions": 611,
       "clicks": 6,
       "ctr": 0.98,
@@ -331,7 +367,7 @@
       "platform": "ig",
       "position": "instagram_stories",
       "ad_name": "",
-      "spend": 8.060677,
+      "spend": 8.06,
       "impressions": 1108,
       "clicks": 18,
       "ctr": 1.62,
@@ -343,7 +379,7 @@
       "platform": "th",
       "position": "threads_feed",
       "ad_name": "",
-      "spend": 6.710564,
+      "spend": 6.71,
       "impressions": 4183,
       "clicks": 23,
       "ctr": 0.55,
@@ -351,5 +387,5 @@
       "roas": 0.0
     }
   ],
-  "updated_at": "2026-06-11T09:56:17.235393"
+  "updated_at": "2026-06-11T10:06:41.910468"
 }
