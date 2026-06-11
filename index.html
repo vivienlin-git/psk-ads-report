@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Beanne · Meta 廣告素材成效</title>
+<title>PSK · Meta 廣告素材成效</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,7 +72,7 @@
 
 <header>
   <div>
-    <h1>Beanne · Meta 廣告素材成效</h1>
+    <h1>PSK · Meta 廣告素材成效</h1>
     <p id="updatedAt">載入中...</p>
   </div>
   <div class="pills">
@@ -172,7 +172,7 @@ function renderMetrics(data) {
   const avgCpm = data.reduce((s, d) => s + d.cpm, 0) / data.length;
   const roasColor = wRoas >= 3 ? "var(--green)" : "var(--red)";
   document.getElementById("metricGrid").innerHTML = `
-    <div class="metric-card"><div class="metric-label">總花費</div><div class="metric-val">NT$${(totalSpend/1000).toFixed(0)}K</div></div>
+    <div class="metric-card"><div class="metric-label">總花費</div><div class="metric-val">NT$${totalSpend >= 1000 ? (totalSpend/1000).toFixed(1)+"K" : totalSpend.toLocaleString()}</div></div>
     <div class="metric-card"><div class="metric-label">加權 ROAS</div><div class="metric-val" style="color:${roasColor}">${wRoas.toFixed(2)}</div></div>
     <div class="metric-card"><div class="metric-label">平均 CTR</div><div class="metric-val">${avgCtr.toFixed(2)}%</div></div>
     <div class="metric-card"><div class="metric-label">平均 CPM</div><div class="metric-val">NT$${Math.round(avgCpm)}</div></div>
